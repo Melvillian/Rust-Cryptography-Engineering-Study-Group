@@ -1,79 +1,191 @@
-use core::num;
-use std::io;
 
-pub fn encrypt_vigenere(message: &str, key: &str) -> String {
 
-    return "todo".to_string();
-}
+/// Encrypts a message with the Vigenere algorithm using key
+pub fn encrypt_vigenere(message: &str, key: &str) -> Result<String, &'static str> {
+    // ensure the message and key are of a certain form
 
-pub fn decrypt_vigenere(message: &str, key: &str) -> String {
-    return "todo".to_string();
-}
-
-pub fn extend_key(message: &str, key: &str) -> Result<String, &'static str> {
-    let msg_len = message.len();
-    let key_len = key.len();
-
-    if (!message.chars().all(char::is_alphabetic)) {
+    // TODO these could all be done in a single loop, making it faster, but too lazy for now!
+    if !message.chars().all(char::is_alphabetic) {
         return Err("message must contain only alphabetic characters");
     }
-    if (!key.chars().all(char::is_alphabetic)) {
+    for b in message.as_bytes() {
+        if b < &97 || b > &122 {
+            return Err("message must be all lowercase values");
+        }
+    }
+    if !key.chars().all(char::is_alphabetic) {
         return Err("key must contain only alphabetic characters");
     }
-
-    if (msg_len < key_len) {
-        return Err("message length too short for key");
-    }
-
-    // extend the key by copying it repeatedly to match the length
-    // of the message. If the length of the message is not a multiple
-    // of the key length, then do some extra work to extend the
-    // key length to match the message's length by copying over
-    // select characters    
-    let num_times_to_repeat = msg_len / key_len;
-    let remainder = num_times_to_repeat * key_len;
-
-    let mut extended_key = key.repeat(num_times_to_repeat);
-
-    if (remainder != 0) {
-        key.bytes().take(remainder)
-        for i in 0..remainder {
-            extended_key.push(key[i]);
+    for b in key.as_bytes() {
+        if b < &97 || b > &122 {
+            return Err("key must be all lowercase values");
         }
     }
 
+    let key_as_bytes = key.as_bytes();
+    let msg_as_bytes = message.as_bytes();
+    let key_len = key.len();
+    let mut ciphertext = String::new();
 
+    // WARNING: this is probably not a constant time operation, since the
+    // % operation will take longer to compute depending on if `i > key_len`
 
-    return Ok(extended_key);
+    // iterate through the characters of message, using the appropriate character in k
+    // to encrypt it (here encryption is really just an addition of the key byte modulo 26,
+    // because there are 26 possible lowercase alphabetic symbols)
+    for i in 0..message.len() {
+        let key_idx = i % key_len;
+        let msg_byte_shifted = msg_as_bytes[i] - 97;
+        let key_byte_shifted = key_as_bytes[key_idx] - 97;
+        let shift_amount = key_byte_shifted % 26;
+
+        let ciphertext_byte_shifted = msg_byte_shifted + shift_amount;
+        let ciphertext_byte = ciphertext_byte_shifted + 97;
+
+        ciphertext.push(ciphertext_byte as char);
+    }
+    Ok(ciphertext)
 }
+
+/// Decrypts a ciphertext with the Vigenere algorithm using key
+pub fn decrypt_vigenere(ciphertext: &str, key: &str) -> Result<String, &'static str> {
+    // ensure the ciphertext and key are of a certain form
+
+    // TODO these could all be done in a single loop, making it faster, but too lazy for now!
+    if !ciphertext.chars().all(char::is_alphabetic) {
+        return Err("ciphertext must contain only alphabetic characters");
+    }
+    for b in ciphertext.as_bytes() {
+        if b < &97 || b > &122 {
+            return Err("ciphertext must be all lowercase values");
+        }
+    }
+    if !key.chars().all(char::is_alphabetic) {
+        return Err("key must contain only alphabetic characters");
+    }
+    for b in key.as_bytes() {
+        if b < &97 || b > &122 {
+            return Err("key must be all lowercase values");
+        }
+    }
+
+    let key_as_bytes = key.as_bytes();
+    let ciphertext_as_bytes = ciphertext.as_bytes();
+    let key_len = key.len();
+    let mut plaintext = String::new();
+
+    // WARNING: this is probably not a constant time operation, since the
+    // % operation will take longer to compute depending on if `i > key_len`
+
+    // iterate through the characters of ciphertext, using the appropriate character in k
+    // to decrypt it (here decryption is really just a subtraction of the key byte modulo 26,
+    // because there are 26 possible lowercase alphabetic symbols)
+    for i in 0..ciphertext.len() {
+        let key_idx = i % key_len;
+        let ciphertext_byte_shifted = ciphertext_as_bytes[i] - 97;
+        let key_byte_shifted: u8 = key_as_bytes[key_idx] - 97 ;
+        let shift_amount = key_byte_shifted % 26;
+
+        let plaintext_byte_shifted: u8 = (ciphertext_byte_shifted - shift_amount) % 26;
+        let plaintext_byte = plaintext_byte_shifted + 97;
+
+        plaintext.push(plaintext_byte as char);
+    }
+    Ok(plaintext)
+}
+
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
+    
     #[test]
-    fn short_extend_key() {
-        assert_eq!("a".to_string(), extend_key("b", "a").unwrap());
+    fn numeric_invalid_message_characters() {
+        assert_eq!(Err("key must contain only alphabetic characters"), encrypt_vigenere("floopol", "1"));
     }
 
     #[test]
-    fn long_extend_key() {
-        assert_eq!("aaaaa".to_string(), extend_key("floop", "a").unwrap());
+    fn numeric_invalid_key_characters() {
+        assert_eq!(Err("message must contain only alphabetic characters"), encrypt_vigenere("1", "ab"));
     }
 
     #[test]
-    fn divisible_extend_key() {
-        assert_eq!("abcabc".to_string(), extend_key("flooop", "abc").unwrap());
+    fn capitalized_invalid_key_characters() {
+        assert_eq!(Err("key must be all lowercase values"), encrypt_vigenere("floopol", "A"));
     }
 
     #[test]
-    fn not_divisible_extend_key() {
-        assert_eq!("abcabcab".to_string(), extend_key("floopol", "abc").unwrap());
+    fn capitalized_invalid_message_characters() {
+        assert_eq!(Err("message must be all lowercase values"), encrypt_vigenere("ABCDE", "abc"));
     }
 
     #[test]
-    #[should_panic]
-    fn invalid_characters_extend_key() {
-        extend_key("floopol", "19348");
+    fn symbols_invalid_message_characters() {
+        assert_eq!(Err("message must contain only alphabetic characters"), encrypt_vigenere("=", "ab"));
+    }
+
+    #[test]
+    fn symbols_invalid_key_characters() {
+        assert_eq!(Err("key must contain only alphabetic characters"), encrypt_vigenere("floop", "==="));
+    }
+
+    #[test]
+    fn single_letter_encrypt() {
+        assert_eq!(encrypt_vigenere("floop", "a"), Ok("floop".to_string()));
+    }
+
+    #[test]
+    fn small_encrypt() {
+        assert_eq!(encrypt_vigenere("floop", "abc"), Ok("fmqoq".to_string()));
+    }
+
+    #[test]
+    fn divisible_encrypt() {
+        assert_eq!(encrypt_vigenere("floopo", "ab"), Ok("fmoppp".to_string()));
+    }
+
+    #[test]
+    fn not_divisible_encrypt() {
+        assert_eq!(encrypt_vigenere("floob", "bca"), Ok("gnopd".to_string()));
+    }
+
+    #[test]
+    fn single_letter_decrypt() {
+        let plaintext = "floop";
+        let key = "a";
+        let ciphertext = encrypt_vigenere(plaintext, key).unwrap();
+        assert_eq!(decrypt_vigenere(ciphertext.as_str(), key), Ok(plaintext.to_string()));
+    }
+
+    #[test]
+    fn small_decrypt() {
+        let plaintext = "floop";
+        let key = "abc";
+        let ciphertext = encrypt_vigenere(plaintext, key).unwrap();
+        assert_eq!(decrypt_vigenere(ciphertext.as_str(), key), Ok(plaintext.to_string()));
+    }
+
+    #[test]
+    fn divisible_decrypt() {
+        let plaintext = "floob";
+        let key = "bca";
+        let ciphertext = encrypt_vigenere(plaintext, key).unwrap();
+        assert_eq!(decrypt_vigenere(ciphertext.as_str(), key), Ok(plaintext.to_string()));
+    }
+
+    #[test]
+    fn not_divisible_decrypt() {
+        let plaintext = "floob";
+        let key = "bca";
+        let ciphertext = encrypt_vigenere(plaintext, key).unwrap();
+        assert_eq!(decrypt_vigenere(ciphertext.as_str(), key), Ok(plaintext.to_string()));
+    }
+
+    #[test]
+    fn modular_characters_decrypt() {
+        let plaintext = "zzzz";
+        let key = "b";
+        let ciphertext = encrypt_vigenere(plaintext, key).unwrap();
+        assert_eq!(decrypt_vigenere(ciphertext.as_str(), key), Ok(plaintext.to_string()));
     }
 }
