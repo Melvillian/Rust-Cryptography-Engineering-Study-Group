@@ -35,11 +35,13 @@ pub fn encrypt_vigenere(message: &str, key: &str) -> Result<String, &'static str
     // because there are 26 possible lowercase alphabetic symbols)
     for i in 0..message.len() {
         let key_idx = i % key_len;
+
+        // we shift by 97 because 97 is 'a' in ASCII, and we want to do modular
+        // arithmetic modulo 26
         let msg_byte_shifted = msg_as_bytes[i] - 97;
         let key_byte_shifted = key_as_bytes[key_idx] - 97;
-        let shift_amount = key_byte_shifted % 26;
 
-        let ciphertext_byte_shifted = msg_byte_shifted + shift_amount;
+        let ciphertext_byte_shifted = (msg_byte_shifted + key_byte_shifted) % 26;
         let ciphertext_byte = ciphertext_byte_shifted + 97;
 
         ciphertext.push(ciphertext_byte as char);
@@ -82,11 +84,19 @@ pub fn decrypt_vigenere(ciphertext: &str, key: &str) -> Result<String, &'static 
     // because there are 26 possible lowercase alphabetic symbols)
     for i in 0..ciphertext.len() {
         let key_idx = i % key_len;
+        
+        // we shift by 97 because 97 is 'a' in ASCII, and we want to do modular
+        // arithmetic modulo 26
         let ciphertext_byte_shifted = ciphertext_as_bytes[i] - 97;
         let key_byte_shifted: u8 = key_as_bytes[key_idx] - 97 ;
-        let shift_amount = key_byte_shifted % 26;
-
-        let plaintext_byte_shifted: u8 = (ciphertext_byte_shifted - shift_amount) % 26;
+        
+        // determine the ciphertext_byte_shifted - key_byte_shifted modulo 26
+        let plaintext_byte_shifted = if ciphertext_byte_shifted >= key_byte_shifted {
+            ciphertext_byte_shifted - key_byte_shifted
+        } else {
+            let diff = key_byte_shifted - ciphertext_byte_shifted;
+            26 - diff
+        }; 
         let plaintext_byte = plaintext_byte_shifted + 97;
 
         plaintext.push(plaintext_byte as char);
@@ -182,9 +192,33 @@ mod tests {
     }
 
     #[test]
-    fn modular_characters_decrypt() {
+    fn modular_characters_decrypt_1() {
         let plaintext = "zzzz";
         let key = "b";
+        let ciphertext = encrypt_vigenere(plaintext, key).unwrap();
+        assert_eq!(decrypt_vigenere(ciphertext.as_str(), key), Ok(plaintext.to_string()));
+    }
+
+    #[test]
+    fn modular_characters_decrypt_2() {
+        let plaintext = "zzzz";
+        let key = "c";
+        let ciphertext = encrypt_vigenere(plaintext, key).unwrap();
+        assert_eq!(decrypt_vigenere(ciphertext.as_str(), key), Ok(plaintext.to_string()));
+    }
+
+    #[test]
+    fn modular_characters_decrypt_3() {
+        let plaintext = "xxx";
+        let key = "b";
+        let ciphertext = encrypt_vigenere(plaintext, key).unwrap();
+        assert_eq!(decrypt_vigenere(ciphertext.as_str(), key), Ok(plaintext.to_string()));
+    }
+
+    #[test]
+    fn modular_characters_decrypt_4() {
+        let plaintext = "xxx";
+        let key = "z";
         let ciphertext = encrypt_vigenere(plaintext, key).unwrap();
         assert_eq!(decrypt_vigenere(ciphertext.as_str(), key), Ok(plaintext.to_string()));
     }
